@@ -1,0 +1,322 @@
+---
+title: "Bike share capstone project"
+author: "Kenny Brian"
+date: "2023-10-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+The purpose of this project is to analyse the annual Bike rides data for the company Cyclistic  
+to draw insights on ride characteristics between two customer segments; Annual members and  
+casual riders. Customers who purchase single-ride or full-day passes are categorised as casual riders while customers who purchase annual memberships are annual members. The business goal is to design marketing strategies aimed at converting casual riders into annual members. To achieve this, we need to use this data to understand how annual members and casual riders use Cyclistic bikes differently.
+
+packages used tidyverse for data import and wrangling
+# libridate for date functions
+# ggplot for visualization
+
+## Collect data
+
+This analysis uses Cyclistic’s historical trip data recorded for the first quarter of 2023 (January, February & March) found [here](https://divvy-tripdata.s3.amazonaws.com/index.html).
+
+We will use `tidyverse` packages for data import and wrangling, `libridate` for date functions
+and `ggplot` for visualization.
+
+```{r loading the packages, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+
+```{r load the datA}
+jan_df <- read.csv("202301-divvy-tripdata.csv")
+feb_df <- read.csv("202302-divvy-tripdata.csv")
+mar_df <- read.csv("202303-divvy-tripdata.csv")
+```
+
+## Wrangling data
+
+
+Preview the data to understand the general understanding of the data
+```{r preview the data}
+glimpse(jan_df)
+```
+
+```{r }
+glimpse(feb_df)
+```
+
+
+we check the columns names to ensure uniformity
+```{r comparing column names}
+column_names<- tibble(colnames(jan_df),colnames(feb_df), colnames(mar_df))
+
+column_names
+```
+The column names matches across the three dataframes. we merge the three datasets into one.
+
+```{r join the datasets}
+trip_df <- bind_rows(jan_df, feb_df, mar_df)
+```
+
+preview the new data
+
+```{r trip_df columns}
+colnames(trip_df)
+```
+check the number of rows in the combined dataframe
+```{r trip_df rows}
+nrow(trip_df)
+```
+
+```{r trip_df summary}
+summary(trip_df)
+```
+
+```{r}
+trip_df$started_at %>% class()
+```
+
+
+```{r rideable categories}
+table(trip_df$rideable_type)
+```
+
+
+## Cleaning the data to prepare for analysis
+
+
+cleaning steps:
+
+* create columns for the days and months of the rides
+* convert the `started_at` & `ended_at` to the correct datatype
+* calculate the trip duration
+* Drop columns with 0 trip duration
+
+#### Checking the number of observations fall under each usertype
+```{r member categories}
+table(trip_df$member_casual)
+```
+
+#### create columns for the days and months of the rides
+
+getting the day of the week https://r4ds.had.co.nz/dates-and-times.html#getting-components
+
+```{r column for start days}
+trip_df <-  trip_df %>%
+  mutate(day_of_the_week = wday(started_at, label = TRUE)) # set the label as true to get the abbreviated day
+
+```
+
+getting the day of the month
+```{r day of the month}
+trip_df <- trip_df %>%
+  mutate(day_of_the_month= mday(started_at))
+```
+
+getting the the month
+```{r month}
+trip_df <- trip_df %>% 
+  mutate(month = month(started_at, label=TRUE))
+```
+
+#### amending the data type 
+
+convert the `started_at` & `ended_at` to the correct datatype
+```{r updating datatype}
+trip_df$started_at <- ymd_hms(trip_df$started_at)
+trip_df$ended_at <- ymd_hms(trip_df$ended_at)
+```
+
+#### calculating the trip duration. 
+
+calculate trip duration #https://r4ds.had.co.nz/dates-and-times.html#durations
+```{r calculating trip duration}
+trip_df <- trip_df %>%
+  mutate(trip_duration = ended_at-started_at)
+```
+
+.............................
+
+first we check if the was a ride the ended the following day.  
+we notice that we have one entry for which the trip duration is negative
+
+```{r trip duration overview}
+trip_df %>%
+  filter(trip_duration < 0)
+```
+we remove this entry
+```{r remove -ve entry}
+trip_df2 <- trip_df %>%
+  filter(!trip_duration < 0)
+```
+
+
+
+
+```{r trip duration summary2}
+trip_df2 %>%
+  group_by(member_casual) %>%
+  filter(start_station_name == end_station_name & trip_duration < 3 )%>%
+  count()
+
+```
+
+there are 35 entries for which the trip duration is 0. The hypothesis is that perhaps the users changed the bike or aborted the ride altogether. so we drop these cases.
+
+................................................................................
+
+## Descriptive analysis
+
+Bike type preference by type of customer
+
+```{r bike type preference}
+with(trip_df2, table(member_casual, rideable_type) )
+
+```
+
+proportion of bike preference by customer type 
+
+```{r bike type preference proportions}
+100 * table(trip_df2$member_casual, trip_df2$rideable_type) %>%
+  prop.table(margin = 1)%>%
+  round(4)
+
+```
+
+
+trip duration summary by customer type
+```{r trip duration summary}
+trip_df %>%
+  group_by(member_casual) %>%
+  summarize(
+    av_duration = mean(trip_duration),
+    min = min(trip_duration),
+    max = max(trip_duration))
+
+```
+
+calculate the number of trips by day
+```{r total trips by day}
+table(trip_df$member_casual, trip_df$day_of_the_week)
+
+```
+
+calculating the proportion of rides by day
+
+```{r prop trips by day}
+100 * table(trip_df2$member_casual, trip_df2$day_of_the_week) %>%
+  prop.table(margin = 1) %>% 
+  round(4) 
+
+```
+
+## Plots
+
+#### visualizing the number of rides by day of the week and customer segment
+
+
+```{r plot trip_by_day}
+ggplot(tibble(trip_df2$member_casual, trip_df2$day_of_the_week))+
+         geom_bar(mapping = aes(x =trip_df2$day_of_the_week,
+                                fill = trip_df2$member_casual),
+                                position = "dodge") + 
+  labs(title = "Comparison of the number of rides by day of the week",
+  x ="day of the week", y = "number of rides", fill = "customer type") #+
+  #facet_wrap(~trip_df$member_casual)
+                  
+```
+#### visualizing the average trip duration by customer type
+
+```{r average trip duration by customer type}
+trip_df2 %>%
+  group_by(member_casual) %>%
+  summarise(trip_duration_min = as.numeric(mean(trip_duration), units = "mins")) %>%
+  ggplot(aes(x = member_casual, y = trip_duration_min, fill = member_casual)) + 
+  geom_col() + 
+  geom_text(aes(label = round(trip_duration_min, 2), vjust= -.2)) +
+  labs(title = "average trip duration in minutes", x = "customer type",
+       y = "av trip duration in min")
+  
+
+```
+
+
+
+#### comparing the average duration of rides by customer type and day of the week
+
+```{r average duration viz, message=FALSE, warning=FALSE}
+trip_df2 %>%
+  group_by(member_casual, day_of_the_week) %>%
+  summarise(av_duration = as.numeric(mean(trip_duration), units = 'mins')) %>%
+  ggplot(aes(x = day_of_the_week, y = av_duration, fill = member_casual)) +
+  geom_col() +
+  labs(title = "Average ride duration by day of the week", x = "day of the week",
+       y = "trip duration in minutes") +
+  facet_wrap(~member_casual)
+
+```
+#### visualizing bike preferences
+
+visualizing the proportion of bike preference by customer type we notice that a higher proportion of customers in both segments prefer electric bikes over other bike types. 
+However, there are no subscribed members that used docked bikes. 
+
+```{r bike type proportions viz}
+trip_df2 %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise(n = n())%>%
+  mutate(prop = 100*n/sum(n)) %>%
+  ggplot(aes(x = rideable_type, y = prop, fill= member_casual)) +
+  geom_col(position = "dodge") +
+  #geom_text(aes(label = round(prop,2), vjust = -.1)) +
+  #facet_grid(~member_casual) +
+  labs(title = "bike preference by customer type", x = "type of bike", y = "percent") +
+  coord_flip()
+
+
+```
+
+Now we compare the average ride duration for each bike type. 
+
+```{r bike type vs duration}
+bike_type_duration <- trip_df2 %>%
+  group_by(rideable_type, member_casual) %>%
+  summarise(av_dur = as.numeric(mean(trip_duration), units = "mins"))
+
+viz <- ggplot(bike_type_duration, aes(rideable_type, av_dur, fill = member_casual ))
+viz + geom_col(position = "dodge") +
+  labs(title = "Average ride duration(minutes) vs. bike type", x = "bike type", 
+       y = "trip duration in min") +
+  coord_flip() #+
+  #geom_text(aes(label = round(av_dur,2), hjust = -.1))
+
+```
+
+```{r bike type duration vs. day of the week}
+trip_df2 %>%
+  group_by(member_casual, day_of_the_week, rideable_type) %>%
+  summarise(av_duration = as.numeric(mean(trip_duration), units = 'mins')) %>%
+  ggplot(aes(day_of_the_week, av_duration, fill = rideable_type)) +
+  geom_col(position = "dodge")+
+  facet_wrap(~member_casual) +
+  labs(title = "Average ride duration(minutes) by day of the week vs. bike type", x = "bike type", 
+       y = "trip duration in min")
+
+```
+
+## EXPORT SUMMARY FILE FOR FURTHER ANALYSIS
+
+Exported the cleaned and wrangled file to CSV for further analysis in Tableau
+
+```{r export csv, include=FALSE}
+
+write.csv(trip_df2, "C:/Users/bmbaabu/Anaconda3/Coursera/Course 7_Data Analysis with R programming/Capstone/Capstone 1_Bike sharing/trip_df.csv", row.names=TRUE)
+
+```
+
