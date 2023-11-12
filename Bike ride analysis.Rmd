@@ -16,9 +16,10 @@ The purpose of this project is to analyse the annual Bike rides data for the com
 to draw insights on ride characteristics between two customer segments; Annual members and  
 casual riders. Customers who purchase single-ride or full-day passes are categorised as casual riders while customers who purchase annual memberships are annual members. The business goal is to design marketing strategies aimed at converting casual riders into annual members. To achieve this, we need to use this data to understand how annual members and casual riders use Cyclistic bikes differently.
 
-packages used tidyverse for data import and wrangling
-# libridate for date functions
-# ggplot for visualization
+packages used 
+- tidyverse for data import and wrangling
+- lubridate for date functions
+- ggplot for visualization
 
 ## Collect data
 
