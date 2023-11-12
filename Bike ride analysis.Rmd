@@ -25,7 +25,7 @@ packages used
 
 This analysis uses Cyclistic’s historical trip data recorded for the first quarter of 2023 (January, February & March) found [here](https://divvy-tripdata.s3.amazonaws.com/index.html).
 
-We will use `tidyverse` packages for data import and wrangling, `libridate` for date functions
+We will use `tidyverse` packages for data import and wrangling, `lubridate` for date functions
 and `ggplot` for visualization.
 
 ```{r loading the packages, warning=FALSE}
